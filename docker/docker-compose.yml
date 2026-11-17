@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL database with integrated WAL-G for continuous backup/restore
+  postgres:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    container_name: dr-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT: http://dr-minio:9000
+      WALG_S3_PREFIX: s3://${DB_NAME}-backups/wal
+      WALG_S3_FORCE_PATH_STYLE: "true"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dr-net
+    depends_on:
+      - minio
+
+  # 2. Rclone background synchronization service (commented out as requested)
+  # rclone:
+  #   image: rclone/rclone:latest
+  #   container_name: dr-rclone
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./configs/rclone.conf:/config/rclone/rclone.conf:ro
+  #     - C:/dr-lab/sync-data:/data:z
+  #   command: ["sync", "/data", "remote:bucket", "--config", "/config/rclone/rclone.conf", "--transfers", "4", "--checkers", "8", "--contimeout", "60s", "--timeout", "300s", "--retries", "3", "--low-level-retries", "10", "--stats", "1m"]
+  #   networks:
+  #     - dr-net
+
+  # 3. WireGuard secure VPN tunnel service
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: dr-wireguard
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - SERVERURL=auto
+      - PEERS=1
+    volumes:
+      - ./configs/wireguard:/config
+    ports:
+      - "51820:51820/udp"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
+    networks:
+      - dr-net
+
+  # 4. MinIO S3-compatible storage service
+  minio:
+    image: minio/minio:latest
+    container_name: dr-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - dr-net
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  dr-net:
+    driver: bridge
