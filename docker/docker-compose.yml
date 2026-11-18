@@ -1,7 +1,6 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  # 1. PostgreSQL database with integrated WAL-G for continuous backup/restore
   postgres:
     build:
       context: ./postgres
@@ -14,32 +13,21 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY}
       AWS_DEFAULT_REGION: us-east-1
-      AWS_ENDPOINT: http://dr-minio:9000
+
+      AWS_ENDPOINT: http://dr-rustfs:9000
       WALG_S3_PREFIX: s3://${DB_NAME}-backups/wal
       WALG_S3_FORCE_PATH_STYLE: "true"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    depends_on:
+      - rustfs
     networks:
       - dr-net
-    depends_on:
-      - minio
 
-  # 2. Rclone background synchronization service (commented out as requested)
-  # rclone:
-  #   image: rclone/rclone:latest
-  #   container_name: dr-rclone
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ./configs/rclone.conf:/config/rclone/rclone.conf:ro
-  #     - C:/dr-lab/sync-data:/data:z
-  #   command: ["sync", "/data", "remote:bucket", "--config", "/config/rclone/rclone.conf", "--transfers", "4", "--checkers", "8", "--contimeout", "60s", "--timeout", "300s", "--retries", "3", "--low-level-retries", "10", "--stats", "1m"]
-  #   networks:
-  #     - dr-net
-
-  # 3. WireGuard secure VPN tunnel service
   wireguard:
     image: lscr.io/linuxserver/wireguard:latest
     container_name: dr-wireguard
@@ -48,11 +36,11 @@ services:
       - NET_ADMIN
       - SYS_MODULE
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-      - SERVERURL=auto
-      - PEERS=1
+      PUID: 1000
+      PGID: 1000
+      TZ: Etc/UTC
+      SERVERURL: auto
+      PEERS: 1
     volumes:
       - ./configs/wireguard:/config
     ports:
@@ -63,26 +51,35 @@ services:
     networks:
       - dr-net
 
-  # 4. MinIO S3-compatible storage service
-  minio:
-    image: minio/minio:latest
-    container_name: dr-minio
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: dr-rustfs
     restart: unless-stopped
     ports:
       - "9000:9000"
-      - "9001:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server /data --console-address ":9001"
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
     volumes:
-      - minio_data:/data
+      - rustfs_data:/data
+    networks:
+      - dr-net
+
+  rclone:
+    image: rclone/rclone:latest
+    container_name: dr-rclone
+    restart: unless-stopped
+    entrypoint: ["tail", "-f", "/dev/null"]
+    volumes:
+      - ./configs/rclone:/config/rclone
+    depends_on:
+      - rustfs
     networks:
       - dr-net
 
 volumes:
   postgres_data:
-  minio_data:
+  rustfs_data:
 
 networks:
   dr-net:
