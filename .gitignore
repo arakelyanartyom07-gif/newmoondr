@@ -1,0 +1,7 @@
+**/.env
+**/.env*
+**/rclone.conf
+**/wireguard/peer1/
+**/wireguard/wg_confs/
+**/wireguard/server/
+**/.donoteditthisfile
