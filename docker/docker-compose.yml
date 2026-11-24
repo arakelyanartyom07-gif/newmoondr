@@ -1,12 +1,17 @@
 services:
+
   postgres:
     build:
       context: ./postgres
       dockerfile: Dockerfile
+
     container_name: dr-postgres
+
     restart: unless-stopped
+
     ports:
       - "5432:5432"
+
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -17,61 +22,60 @@ services:
       AWS_DEFAULT_REGION: us-east-1
 
       AWS_ENDPOINT: http://dr-rustfs:9000
+
       WALG_S3_PREFIX: s3://${DB_NAME}-backups/wal
       WALG_S3_FORCE_PATH_STYLE: "true"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     depends_on:
       - rustfs
-    networks:
-      - dr-net
 
-  wireguard:
-    image: lscr.io/linuxserver/wireguard:latest
-    container_name: dr-wireguard
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Etc/UTC
-      SERVERURL: auto
-      PEERS: 1
-    volumes:
-      - ./configs/wireguard:/config
-    ports:
-      - "51820:51820/udp"
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-      - net.ipv4.ip_forward=1
     networks:
       - dr-net
 
   rustfs:
     image: rustfs/rustfs:latest
+
     container_name: dr-rustfs
+
     restart: unless-stopped
+
     ports:
       - "9000:9000"
+
     environment:
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
       RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+
     volumes:
       - rustfs_data:/data
+
     networks:
       - dr-net
 
-  rclone:
-    image: rclone/rclone:latest
-    container_name: dr-rclone
+  sync:
+    build:
+      context: .
+      dockerfile: ./sync/Dockerfile
+
+    container_name: dr-sync
+
     restart: unless-stopped
-    entrypoint: ["tail", "-f", "/dev/null"]
+
     volumes:
-      - ./configs/rclone:/config/rclone
+      - ../src:/app/src
+      - ./sync/jobs.json:/app/src/jobs.json:ro
+      - ./configs/rclone:/root/.config/rclone
+
+    working_dir: /app/src
+
+    command: python sync_manager.py
+
     depends_on:
       - rustfs
+
     networks:
       - dr-net
 
