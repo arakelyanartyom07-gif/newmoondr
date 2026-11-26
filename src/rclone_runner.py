@@ -26,13 +26,12 @@ def create_bucket(remote, bucket):
     )
 
 
-def sync_bucket(bucket):
+def sync_bucket(source, destination):
 
-    source = f"aws3:{bucket}"
-    destination = f"rustfs:{bucket}"
+    bucket_name = destination.split(":")[1]
 
-    if not bucket_exists("rustfs", bucket):
-        create_bucket("rustfs", bucket)
+    if not bucket_exists("rustfs", bucket_name):
+        create_bucket("rustfs", bucket_name)
 
     subprocess.run(
         [

@@ -8,15 +8,22 @@ def run():
 
     config = load_jobs()
 
-    for bucket in config["buckets"]:
+    for env in config["environments"]:
 
         try:
 
-            print(
-                f"Synchronizing {bucket}"
-            )
+            bucket = env.get("bucket")
 
-            sync_bucket(bucket)
+            if bucket:
+
+                print(
+                    f"Synchronizing {env['name']}"
+                )
+
+                sync_bucket(
+                    bucket["source"],
+                    bucket["destination"]
+                )
 
         except Exception as exc:
 
