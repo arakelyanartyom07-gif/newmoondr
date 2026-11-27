@@ -1,6 +1,7 @@
 import time
 
 from jobs_loader import load_jobs
+from secrets_manager import get_secret
 from rclone_runner import sync_bucket
 
 
@@ -12,12 +13,30 @@ def run():
 
         try:
 
-            bucket = env.get("bucket")
+            print(
+                f"Processing environment: {env['name']}"
+            )
+
+            rclone_secret = get_secret(
+                env["rclone_secret"]
+            )
+
+            db_secret = get_secret(
+                env["db_secret"]
+            )
+
+            print(
+                "Secrets loaded successfully"
+            )
+
+            bucket = env.get(
+                "bucket"
+            )
 
             if bucket:
 
                 print(
-                    f"Synchronizing {env['name']}"
+                    f"Synchronizing {env['name']} bucket"
                 )
 
                 sync_bucket(
@@ -25,9 +44,15 @@ def run():
                     bucket["destination"]
                 )
 
+            print(
+                f"Environment {env['name']} completed"
+            )
+
         except Exception as exc:
 
-            print(exc)
+            print(
+                f"{env['name']} : {exc}"
+            )
 
 
 if __name__ == "__main__":

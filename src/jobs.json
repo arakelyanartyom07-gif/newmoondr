@@ -1,0 +1,22 @@
+{
+  "interval_hours": 4,
+  "environments": [
+    {
+      "name": "uat",
+
+      "rclone_secret": "newmoon/uat/rclone",
+
+      "db_secret": "newmoon/uat/directus",
+
+      "bastion": {
+        "instance_id": "i-0c1262c11b474c080",
+        "region": "eu-central-1"
+      },
+
+      "bucket": {
+        "source": "aws3:nm-uat-media-qded6p",
+        "destination": "rustfs:nm-uat-media-qded6p"
+      }
+    }
+  ]
+}

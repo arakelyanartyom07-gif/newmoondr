@@ -22,7 +22,7 @@ def create_bucket(remote, bucket):
             "mkdir",
             f"{remote}:{bucket}"
         ],
-        check=False
+        check=True
     )
 
 
@@ -42,5 +42,5 @@ def sync_bucket(source, destination):
             "--progress",
             "--create-empty-src-dirs"
         ],
-        check=False
+        check=True
     )
